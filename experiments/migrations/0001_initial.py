@@ -10,6 +10,10 @@ except ImportError:  # django < 1.5
 else:
     User = get_user_model()
 
+# With the default User model these will be 'auth.User' and 'auth.user'
+# so instead of using orm['auth.User'] we can use orm[user_orm_label]
+user_orm_label = '%s.%s' % (User._meta.app_label, User._meta.object_name)
+user_model_label = '%s.%s' % (User._meta.app_label, User._meta.model_name)
 
 class Migration(SchemaMigration):
 
@@ -31,7 +35,7 @@ class Migration(SchemaMigration):
         # Adding model 'Enrollment'
         db.create_table('experiments_enrollment', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=orm["%s.%s" % (User._meta.app_label, User._meta.object_name)], null=True)),
+            ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=orm[user_orm_label], null=True)),
             ('experiment', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['experiments.Experiment'])),
             ('enrollment_date', self.gf('django.db.models.fields.DateField')(auto_now_add=True, db_index=True, blank=True)),
             ('alternative', self.gf('django.db.models.fields.CharField')(max_length=50)),
@@ -69,8 +73,13 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '50'})
         },
-        "%s.%s" % (User._meta.app_label, User._meta.module_name): {
-            'Meta': {'object_name': User.__name__ },
+        # http://kevindias.com/writing/django-custom-user-models-south-and-reusable-apps/
+        user_model_label: {
+            # We've accounted for changes to:
+            # the app name, table name, pk attribute name, pk column name.
+            # The only assumption left is that the pk is an AutoField (see below)
+            'Meta': { 'object_name': User.__name__, 'db_table': "'%s'" % User._meta.db_table },
+            User._meta.pk.attname: ('django.db.models.fields.AutoField', [], {'primary_key': 'True', 'db_column': "'%s'" % User._meta.pk.column})
         },
         'contenttypes.contenttype': {
             'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},
